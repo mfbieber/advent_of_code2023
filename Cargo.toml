@@ -9,5 +9,5 @@ edition = "2021"
 futures = "0.3.29"
 
 [[bin]]
-name = "day1"
-path = "src/day1.rs"
+name = "main"
+path = "src/main.rs"

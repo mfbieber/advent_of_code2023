@@ -1,13 +1,5 @@
-use std::fs::File;
-use std::io::{self, BufRead};
-use std::path::{Path, PathBuf};
-
-fn main() {
-    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push("resources/day1/input.txt");
-    //day1(false, &d);
-    day1(true, &d);
-}
+use std::path::PathBuf;
+use crate::read_lines;
 
 fn day1(part2: bool, path: &PathBuf) -> u32 {
     let mut sum: u32 = 0;
@@ -103,7 +95,7 @@ fn replace_words(string: &String, i: usize) -> (String, bool) {
     if replaced {
         return (string_copy.clone(), true);
     }
-    let  (string_copy, replaced) = replace_word(&string, i, "three".parse().unwrap(), 3);
+    let (string_copy, replaced) = replace_word(&string, i, "three".parse().unwrap(), 3);
     if replaced {
         return (string_copy.clone(), true);
     }
@@ -134,18 +126,10 @@ fn replace_words(string: &String, i: usize) -> (String, bool) {
     return (string_copy.clone(), false);
 }
 
-// The output is wrapped in a Result to allow matching on errors
-// Returns an Iterator to the Reader of the lines of the file.
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-    where P: AsRef<Path>, {
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use crate::day1;
+    use crate::day1::day1;
 
     #[test]
     fn test_part1() {
@@ -159,6 +143,20 @@ mod tests {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day1/test/input2.txt");
         assert_eq!(day1(true, &d), 281);
+    }
+
+    #[test]
+    fn part1() {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/day1/input.txt");
+        assert_eq!(day1(false, &d), 54081);
+    }
+
+    #[test]
+    fn part2() {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/day1/input.txt");
+        assert_eq!(day1(true, &d), 54649);
     }
 
 }
