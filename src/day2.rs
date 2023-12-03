@@ -29,7 +29,39 @@ impl PartialEq for Set {
     }
 }
 
-fn day2(part2: bool, path: &PathBuf) -> i32 {
+fn day2_part2(path: &PathBuf) -> i32 {
+    let mut sum: i32 = 0;
+    // File input.txt must exist in the current path
+    if let Ok(lines) = read_lines(path) {
+        let games: Vec<Game> = lines.map(|line| {
+            let mut min_red: i32 = 0;
+            let mut min_blue: i32 = 0;
+            let mut min_green: i32 = 0;
+
+            let unwrapped_line = line.as_ref().unwrap();
+            println!("{}", unwrapped_line);
+            let game: Game = parse_game(unwrapped_line);
+            let sets: &Vec<Set> = &game.sets;
+            &sets.iter().for_each(|set| {
+                if set.red > min_red {
+                    min_red = set.red;
+                }
+                if set.blue > min_blue {
+                    min_blue = set.blue;
+                }
+                if set.green > min_green {
+                    min_green = set.green;
+                }
+            });
+            let power: i32 = min_green*min_blue*min_red;
+            sum = sum + power;
+            return game;
+        }).collect::<Vec<Game>>();
+    }
+    return sum;
+}
+
+fn day2_part1(path: &PathBuf) -> i32 {
     let red_limit = 12;
     let green_limit = 13;
     let blue_limit = 14;
@@ -94,7 +126,7 @@ fn parse_game(line: &str) -> Game {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use crate::day2::{day2, Game, parse_game, Set};
+    use crate::day2::{day2_part1, day2_part2, Game, parse_game, Set};
 
     #[test]
     fn test_parse_line() {
@@ -121,21 +153,28 @@ mod tests {
     fn test_part1() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day2/test/input.txt");
-        assert_eq!(day2(false, &d), 8);
+        assert_eq!(day2_part1(&d), 8);
     }
 
     #[test]
     fn part1() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day2/input.txt");
-        assert_eq!(day2(false, &d), 2278);
+        assert_eq!(day2_part1(&d), 2278);
     }
 
     #[test]
     fn test_part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("resources/day2/test/input2.txt");
-        assert_eq!(day2(true, &d), 281);
+        d.push("resources/day2/test/input.txt");
+        assert_eq!(day2_part2(&d), 2286);
+    }
+
+    #[test]
+    fn part2() {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/day2/input.txt");
+        assert_eq!(day2_part2(&d), 67953);
     }
 
 }
