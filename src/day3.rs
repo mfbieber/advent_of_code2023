@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use crate::read_lines;
-struct Number {
+pub struct Number {
     number: i32,
     x: i32,
     y: i32
@@ -126,14 +126,36 @@ fn push_number(numbers: &mut Vec<Number>, y: &mut i32, x: &mut i32, num_vec: &mu
     numbers.push(number);
 }
 
-fn day3_part2(path: &PathBuf) -> u32 {
-    let mut sum: u32 = 0;
+fn day3_part2(path: &PathBuf) -> i32 {
+    let mut sum: i32 = 0;
+    let mut symbols: Vec<Symbol> = vec![];
+    let mut numbers: Vec<Number> = vec![];
     // File input.txt must exist in the current path
-    if let Ok(lines) = read_lines(path) {
-        for line in lines {
+    parse_lines_to_numbers_and_symbols(path, &mut symbols, &mut numbers);
+    let gears: Vec<Symbol> = symbols.into_iter().filter(|symbol| {
+        symbol.symbol.eq("*")
+    }).collect::<Vec<Symbol>>();
 
+    gears.iter().for_each(|gear| {
+        let mut gears: i32 = 0;
+        let mut gear_ratio: i32 = 0;
+        for number in &numbers {
+            if number.is_symbol_adjacent(gear) {
+                if gear_ratio == 0 {
+                    gear_ratio = number.number;
+                } else {
+                    gear_ratio = gear_ratio * number.number;
+                }
+                gears += 1;
+            }
+            if gears == 2 {
+                sum = sum + gear_ratio;
+                gear_ratio = 0;
+                gears = 0;
+                break;
+            }
         }
-    }
+    });
     println!("{}", sum);
     return sum;
 }
@@ -350,15 +372,15 @@ mod tests {
     #[test]
     fn test_part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("resources/day3/test/input1.txt");
-        assert_eq!(day3_part2(&d), 281);
+        d.push("resources/day3/test/input.txt");
+        assert_eq!(day3_part2(&d), 467835);
     }
 
     #[test]
     fn part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("resources/day3/input1.txt");
-        assert_eq!(day3_part2(&d), 281);
+        d.push("resources/day3/input.txt");
+        assert_eq!(day3_part2(&d), 79613331);
     }
 
 }
