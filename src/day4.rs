@@ -10,7 +10,7 @@ fn day4_part2(path: &PathBuf) -> i32 {
     if let Ok(lines) = read_lines(path) {
        let mut line_number: i32 = 0;
         for line in lines {
-            let matching_numbers: Vec<i32> = match_numbers(&mut sum, line.as_ref().unwrap());
+            let matching_numbers: Vec<i32> = match_numbers(line.as_ref().unwrap());
             let count: usize = matching_numbers.iter().count();
             let mut i: i32 = line_number;
             let cards: i32 = instances[i as usize] + 1;
@@ -33,7 +33,7 @@ fn day4_part1(path: &PathBuf) -> i32 {
     // File input.txt must exist in the current path
     if let Ok(lines) = read_lines(path) {
         for line in lines {
-            let matching_numbers: Vec<i32> = match_numbers(&mut sum, line.as_ref().unwrap());
+            let matching_numbers: Vec<i32> = match_numbers(line.as_ref().unwrap());
             let count: usize = matching_numbers.iter().count();
             if count != 0 {
                 sum = sum + 2_i32.pow((count - 1) as u32);
@@ -44,8 +44,7 @@ fn day4_part1(path: &PathBuf) -> i32 {
     return sum;
 }
 
-fn match_numbers(sum: &mut i32, line: &String) -> Vec<i32> {
-    let mut sum: i32 = 0;
+fn match_numbers(line: &String) -> Vec<i32> {
     let split_1: Vec<&str> = line.split(":").collect();
     let split_2: Vec<&str> = split_1.get(1).unwrap().split("|").collect();
     let winning_numbers: HashSet<i32> = split_2.get(0).unwrap()
