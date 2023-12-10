@@ -1,18 +1,54 @@
+use std::collections::HashSet;
+use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use crate::day3::Number;
 use crate::read_lines;
 
-fn day5_part2(path: &PathBuf) -> u32 {
-    let mut sum: u32 = 0;
-    // File input.txt must exist in the current path
-    if let Ok(lines) = read_lines(path) {
-        for line in lines {
+#[derive(Debug)]
+struct SeedRange {
+    source: i64,
+    range: i64
+}
 
+fn day5_part2(path: &PathBuf, seed_ranges: Vec<SeedRange>) -> i64 {
+    println!("start");
+    let mappings = read_mappings(path);
+    let mut smallest_location: i64 = SIZE as i64;
+    let mut location: i64 = 0;
+    for seed_range in seed_ranges {
+        println!("{:?}", seed_range);
+        let source: i64 = seed_range.source;
+        let range: i64 = seed_range.range;
+        let mut i: i64 = 0;
+        while i < range {
+            location = find_smallest_location_in_mappings_for_seed(source+i, &mappings);
+            i += 1;
+            if location < smallest_location {
+                smallest_location = location;
+                println!("{}", smallest_location);
+            }
         }
     }
-    println!("{}", sum);
-    return sum;
+    return smallest_location;
+}
+
+fn find_smallest_location_in_mappings_for_seed(seed: i64, mappings: &Vec<Mapping>) -> i64 {
+    let mut smallest_location: i64 = SIZE as i64;
+    let mut dest: i64 = seed;
+    for mapping in mappings {
+        for range in &mapping.mapping_ranges {
+            if range.is_in_source_range(dest) {
+                dest = range.get_dest(dest);
+                break;
+            }
+        }
+    }
+    if dest < smallest_location {
+        smallest_location = dest;
+        println!("{}", smallest_location)
+    }
+    println!("{}", smallest_location);
+    return smallest_location;
 }
 
 const SIZE: usize = 11322857500;
@@ -53,8 +89,33 @@ impl Mapping {
     }
 }
 
-fn day5_part1(path: &PathBuf, seeds: Vec<i64>) -> i64 {
+fn get_smallest_location_for_seeds(path: &PathBuf, seeds: HashSet<i64>) -> i64 {
+    let mappings = read_mappings(path);
+    return find_smallest_location_in_mappings(seeds, &mappings);
+}
 
+fn find_smallest_location_in_mappings(seeds: HashSet<i64>, mappings: &Vec<Mapping>) -> i64 {
+    let mut smallest_location: i64 = SIZE as i64;
+    for seed in seeds {
+        let mut dest: i64 = seed;
+        for mapping in mappings {
+            for range in &mapping.mapping_ranges {
+                if range.is_in_source_range(dest) {
+                    dest = range.get_dest(dest);
+                    break;
+                }
+            }
+        }
+        if dest < smallest_location {
+            smallest_location = dest;
+            println!("{}", smallest_location)
+        }
+    }
+    println!("{}", smallest_location);
+    return smallest_location;
+}
+
+fn read_mappings(path: &PathBuf) -> Vec<Mapping> {
     let mut mappings: Vec<Mapping> = vec![];
     let mut mapping_name = String::from("");
     let mut mr0: Vec<MappingRange> = vec![];
@@ -93,53 +154,23 @@ fn day5_part1(path: &PathBuf, seeds: Vec<i64>) -> i64 {
             }
         }
     }
-    mappings.push(Mapping {
-        name: String::from("seed-to-soil"),
-        mapping_ranges: mr0,
-    });
-    mappings.push(Mapping {
-        name: String::from("soil-to-fertilizer"),
-        mapping_ranges: mr1,
-    });
-    mappings.push(Mapping {
-        name: String::from("fertilizer-to-water"),
-        mapping_ranges: mr2,
-    });
-    mappings.push(Mapping {
-        name: String::from("water-to-light"),
-        mapping_ranges: mr3,
-    });
-    mappings.push(Mapping {
-        name: String::from("light-to-temperature"),
-        mapping_ranges: mr4,
-    });
-    mappings.push(Mapping {
-        name: String::from("temperature-to-humidity"),
-        mapping_ranges: mr5,
-    });
-    mappings.push(Mapping {
-        name: String::from("humidity-to-location"),
-        mapping_ranges: mr6,
-    });
-    println!("mappings");
 
-    let mut smallest_location: i64 = SIZE as i64;
-    for seed in seeds {
-        let mut dest: i64 = seed;
-        for mapping in &mappings {
-            for range in &mapping.mapping_ranges {
-                if range.is_in_source_range(dest) {
-                    dest = range.get_dest(dest);
-                    break;
-                }
-            }
-        }
-        if dest < smallest_location {
-            smallest_location = dest;
-        }
-    }
-    println!("{}", smallest_location);
-    return smallest_location;
+    push_mapping(&mut mappings, mr0, String::from("seed-to-soil"));
+    push_mapping(&mut mappings, mr1, String::from("soil-to-fertilizer"));
+    push_mapping(&mut mappings, mr2, String::from("fertilizer-to-water"));
+    push_mapping(&mut mappings, mr3, String::from("water-to-light"));
+    push_mapping(&mut mappings, mr4, String::from("light-to-temperature"));
+    push_mapping(&mut mappings, mr5, String::from("temperature-to-humidity"));
+    push_mapping(&mut mappings, mr6, String::from("humidity-to-location"));
+    println!("mappings");
+    mappings
+}
+
+fn push_mapping(mappings: &mut Vec<Mapping>, mut mapping_ranges: Vec<MappingRange>, mut name: String) {
+    mappings.push(Mapping {
+        name,
+        mapping_ranges,
+    });
 }
 
 fn get_mapping_range(line_ref: &String, mut mapping_name: &String) -> MappingRange {
@@ -157,8 +188,9 @@ fn get_mapping_range(line_ref: &String, mut mapping_name: &String) -> MappingRan
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::path::PathBuf;
-    use crate::day5::{day5_part1, MappingRange};
+    use crate::day5::{day5_part2, get_smallest_location_for_seeds, MappingRange, SeedRange};
 
     #[test]
     fn test_is_in_source_range() {
@@ -204,32 +236,104 @@ mod tests {
     fn test_part1() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day5/test/input.txt");
-        let seeds: Vec<i64> = vec![79, 14, 55, 13];
-        assert_eq!(day5_part1(&d, seeds), 35);
+        let mut seeds: HashSet<i64> = HashSet::new();
+        seeds.insert(79);
+        seeds.insert(14);
+        seeds.insert(55);
+        seeds.insert(13);
+        assert_eq!(get_smallest_location_for_seeds(&d, seeds), 35);
     }
 
     #[test]
     fn part1() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day5/input.txt");
-        let seeds: Vec<i64> = vec![5844012, 110899473, 1132285750, 58870036, 986162929, 109080640,
-            3089574276, 100113624, 2693179996, 275745330, 2090752257, 201704169, 502075018,
-            396653347, 1540050181, 277513792, 1921754120, 26668991, 3836386950, 66795009];
-        assert_eq!(day5_part1(&d, seeds), 825516882);
+        let mut seeds: HashSet<i64> = HashSet::new();
+        seeds.insert(5844012);
+        seeds.insert(110899473);
+        seeds.insert(1132285750);
+        seeds.insert(58870036);
+        seeds.insert(986162929);
+        seeds.insert(109080640);
+        seeds.insert(3089574276);
+        seeds.insert(100113624);
+        seeds.insert(2693179996);
+        seeds.insert(275745330);
+        seeds.insert(2090752257);
+        seeds.insert(201704169);
+        seeds.insert(502075018);
+        seeds.insert(396653347);
+        seeds.insert(1540050181);
+        seeds.insert(277513792);
+        seeds.insert(1921754120);
+        seeds.insert(26668991);
+        seeds.insert(3836386950);
+        seeds.insert(66795009);
+        assert_eq!(get_smallest_location_for_seeds(&d, seeds), 825516882);
     }
 
     #[test]
     fn test_part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("resources/day5/test/input1.txt");
-        //assert_eq!(day5_part2(&d), 281);
+        d.push("resources/day5/test/input.txt");
+        let mut seed_ranges: Vec<SeedRange> = vec![];
+        seed_ranges.push(SeedRange {
+            source: 79,
+            range: 14,
+        });
+        seed_ranges.push(SeedRange {
+            source: 55,
+            range: 13,
+        });
+        assert_eq!(day5_part2(&d, seed_ranges), 46);
     }
 
     #[test]
     fn part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day5/input.txt");
-        //assert_eq!(day5_part2(&d), 281);
+        let mut seed_ranges: Vec<SeedRange> = vec![];
+        seed_ranges.push(SeedRange {
+            source: 5844012,
+            range: 110899473,
+        });
+        seed_ranges.push(SeedRange {
+            source: 1132285750,
+            range: 58870036,
+        });
+        seed_ranges.push(SeedRange {
+            source: 986162929,
+            range: 109080640,
+        });
+        seed_ranges.push(SeedRange {
+            source: 3089574276,
+            range: 100113624,
+        });
+        seed_ranges.push(SeedRange {
+            source: 2693179996,
+            range: 275745330,
+        });
+        seed_ranges.push(SeedRange {
+            source: 2090752257,
+            range: 201704169,
+        });
+        seed_ranges.push(SeedRange {
+            source: 502075018,
+            range: 396653347,
+        });
+        seed_ranges.push(SeedRange {
+            source: 1540050181,
+            range: 277513792,
+        });
+        seed_ranges.push(SeedRange {
+            source: 1921754120,
+            range: 26668991,
+        });
+        seed_ranges.push(SeedRange {
+            source: 3836386950,
+            range: 66795009,
+        });
+        assert_eq!(day5_part2(&d, seed_ranges), 136096660);
     }
 
 }
