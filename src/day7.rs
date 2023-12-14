@@ -8,7 +8,8 @@ use crate::read_lines;
 #[derive(Hash, Clone, Debug, Eq, Ord, PartialOrd)]
 struct Card {
     label: String,
-    strength: i32
+    strength: i32,
+    joker: bool
 }
 
 impl PartialEq<Self> for Card {
@@ -22,35 +23,21 @@ impl Card {
 
     fn calculate_strength(&mut self) {
         if self.label.starts_with("A") {
-            self.strength = 15;
-        } else if self.label.starts_with("K") {
             self.strength = 14;
-        } else if self.label.starts_with("Q") {
-            self.strength = 13
-        } else if self.label.starts_with("J") {
-            self.strength = 12;
         } else if self.label.starts_with("K") {
-            self.strength = 11;
+            self.strength = 13;
+        } else if self.label.starts_with("Q") {
+            self.strength = 12
+        } else if self.label.starts_with("J")  {
+            if self.joker {
+                self.strength = 0;
+            } else {
+                self.strength = 11;
+            }
         } else if self.label.starts_with("T") {
             self.strength = 10;
         } else {
             self.strength = self.label.parse().unwrap();
-        }
-    }
-
-    fn get_strength(&self) -> i32 {
-        if self.label.starts_with("A") {
-            return 14;
-        } else if self.label.starts_with("K") {
-            return 13;
-        } else if self.label.starts_with("Q") {
-            return 12
-        } else if self.label.starts_with("J") {
-            return 11;
-        } else if self.label.starts_with("T") {
-            return 10;
-        } else {
-            return self.label.parse().unwrap();
         }
     }
 }
@@ -72,7 +59,8 @@ struct Hand {
     cards: HashMap<Card, i32>,
     hand_vec: Vec<Card>,
     hand_type: Type,
-    bid: i64
+    bid: i64,
+    joker: bool
 }
 
 impl PartialEq<Self> for Hand {
@@ -96,23 +84,30 @@ impl PartialEq<Self> for Hand {
 
 impl Hand {
 
-    fn new(hand_string: String, bid: i64) -> Self {
-        Hand::build_hand_from_string(hand_string, bid)
+    fn new(hand_string: String, bid: i64, joker: bool) -> Self {
+        Hand::build_hand_from_string(hand_string, bid, joker)
     }
 
-    fn build_hand_from_string(hand_string: String, bid: i64) -> Hand {
+    fn build_hand_from_string(hand_string: String, bid: i64, joker: bool) -> Hand {
         let mut cards: HashMap<Card, i32> = HashMap::new();
         let hand_vec: Vec<Card> = hand_string.chars()
             .map(|card_string| {
                 let mut card = Card {
                     label: String::from(card_string),
                     strength: 0,
+                    joker
                 };
                 card.calculate_strength();
                 return card;
             }).collect();
 
-        let _ = hand_vec.iter().for_each(|card| {
+        let _ = hand_vec.iter().filter(|card| {
+            return if joker && card.label == String::from("J") {
+                false
+            } else {
+                true
+            }
+        }).for_each(|card| {
             let count_option: Option<&i32> = cards.get(&card);
             if count_option.is_some() {
                 cards.insert(card.clone(), count_option.unwrap() + 1);
@@ -120,8 +115,25 @@ impl Hand {
                 cards.insert(card.clone(), 1);
             }
         });
+        let joker_card: Card = Card { label: String::from("J"), strength: 0, joker };
+        if joker && hand_vec.contains(&joker_card) {
+            let mut keys: Vec<Card> = cards.keys().cloned().collect::<Vec<Card>>();
+            keys.sort_by(|a,b| cards.get(b).unwrap().cmp(cards.get(a).unwrap()));
+            let joker_count = hand_vec.iter().filter(|card| {
+                return if joker && card.label == String::from("J") {
+                    true
+                } else {
+                    false
+                }
+            }).count();
+            if keys.len() > 0 {
+                cards.insert(keys[0].clone(), cards.get(&keys[0]).unwrap() + joker_count as i32);
+            } else {
+                cards.insert(Card { label: String::from("A"), strength: 14, joker }, joker_count as i32);
+            }
+        }
         let hand_type: Type = Hand::determine_type_for_cards(&cards);
-        return Hand { cards, hand_vec, hand_type, bid }
+        return Hand { cards, hand_vec, hand_type, bid, joker }
     }
 
     fn determine_type_for_cards(cards: &HashMap<Card, i32>) -> Type {
@@ -158,6 +170,9 @@ impl Hand {
         return Unknown;
     }
 
+    /// Comparison of hands requires the original ordering of the cards and comparison
+    /// of their strength
+    /// TODO consider adapting structs to account for this design and consider removing the HashMap
     fn compare_hands(hand_vec_a: &Vec<Card>, hand_vec_b: &Vec<Card>) -> Ordering {
         return if hand_vec_a[0].strength == hand_vec_b[0].strength {
             Hand::compare_hands(&hand_vec_a[1..].to_owned(), &hand_vec_b[1..].to_owned())
@@ -253,7 +268,7 @@ fn day7_part2(path: &PathBuf) -> u32 {
     return sum;
 }
 
-fn day7_part1(path: &PathBuf) -> i64 {
+fn calculate_winnings(path: &PathBuf, joker: bool) -> i64 {
     let mut hands: Vec<Hand> = vec![];
     // File input.txt must exist in the current path
     if let Ok(lines) = read_lines(path) {
@@ -265,7 +280,7 @@ fn day7_part1(path: &PathBuf) -> i64 {
                 .collect::<Vec<&str>>();
             let hand_string: String = split.get(0).unwrap().clone().parse().unwrap();
             let bid: i64 = split.get(1).unwrap().clone().parse().unwrap();
-            let hand: Hand = Hand::new(hand_string, bid);
+            let hand: Hand = Hand::new(hand_string, bid, joker);
             hands.push(hand);
         }
     }
@@ -284,25 +299,25 @@ fn day7_part1(path: &PathBuf) -> i64 {
 mod tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
-    use crate::day7::{Card, day7_part1, Hand, rank_hands, Type};
+    use crate::day7::{Card, calculate_winnings, Hand, rank_hands, Type};
     use crate::day7::Type::{FiveOfAKind, FourOfAKind, FullHouse, HighCard, OnePair, ThreeOfAKind, TwoPair};
 
     #[test]
     fn test_ranks_test_input_hands_correctly() {
         let mut hands: Vec<Hand> = vec![
-            Hand::new(String::from("32T3K"), 765),
-            Hand::new(String::from("T55J5"), 684),
-            Hand::new(String::from("KK677"), 28),
-            Hand::new(String::from("KTJJT"), 220),
-            Hand::new(String::from("QQQJA"), 483)
+            Hand::new(String::from("32T3K"), 765, false),
+            Hand::new(String::from("T55J5"), 684, false),
+            Hand::new(String::from("KK677"), 28, false),
+            Hand::new(String::from("KTJJT"), 220, false),
+            Hand::new(String::from("QQQJA"), 483, false)
         ];
         rank_hands(&mut hands);
         let expected_ranked_hands: Vec<Hand> = vec![
-            Hand::new(String::from("32T3K"), 765),
-            Hand::new(String::from("KTJJT"), 220),
-            Hand::new(String::from("KK677"), 28),
-            Hand::new(String::from("T55J5"), 684),
-            Hand::new(String::from("QQQJA"), 483),
+            Hand::new(String::from("32T3K"), 765, false),
+            Hand::new(String::from("KTJJT"), 220, false),
+            Hand::new(String::from("KK677"), 28, false),
+            Hand::new(String::from("T55J5"), 684, false),
+            Hand::new(String::from("QQQJA"), 483, false),
         ];
         assert_eq!(&hands,&expected_ranked_hands)
     }
@@ -310,13 +325,13 @@ mod tests {
     #[test]
     fn test_ranks_hands_of_same_type_correctly() {
         let mut hands: Vec<Hand> = vec![
-            Hand::new(String::from("AAAAA"), 111),
-            Hand::new(String::from("KKKKK"), 222)
+            Hand::new(String::from("AAAAA"), 111, false),
+            Hand::new(String::from("KKKKK"), 222, false)
         ];
         rank_hands(&mut hands);
         let expected_ranked_hands: Vec<Hand> = vec![
-            Hand::new(String::from("KKKKK"), 222),
-            Hand::new(String::from("AAAAA"), 111)
+            Hand::new(String::from("KKKKK"), 222, false),
+            Hand::new(String::from("AAAAA"), 111, false)
         ];
         assert_eq!(&hands,&expected_ranked_hands)
     }
@@ -324,13 +339,13 @@ mod tests {
     #[test]
     fn test_ranks_hands_of_same_type_correctly_already_sorted() {
         let mut hands: Vec<Hand> = vec![
-            Hand::new(String::from("AAAAA"), 111),
-            Hand::new(String::from("KKKKK"), 222)
+            Hand::new(String::from("AAAAA"), 111, false),
+            Hand::new(String::from("KKKKK"), 222, false)
         ];
         rank_hands(&mut hands);
         let expected_ranked_hands: Vec<Hand> = vec![
-            Hand::new(String::from("KKKKK"), 222),
-            Hand::new(String::from("AAAAA"), 111)
+            Hand::new(String::from("KKKKK"), 222, false),
+            Hand::new(String::from("AAAAA"), 111, false)
         ];
         assert_eq!(&hands,&expected_ranked_hands)
     }
@@ -338,13 +353,13 @@ mod tests {
     #[test]
     fn test_ranks_hands_of_same_type_is_sort_sensitive() {
         let mut hands: Vec<Hand> = vec![
-            Hand::new(String::from("AAAAA"), 111),
-            Hand::new(String::from("KKKKK"), 222)
+            Hand::new(String::from("AAAAA"), 111, false),
+            Hand::new(String::from("KKKKK"), 222, false)
         ];
         rank_hands(&mut hands);
         let expected_ranked_hands: Vec<Hand> = vec![
-            Hand::new(String::from("AAAAA"), 111),
-            Hand::new(String::from("KKKKK"), 222)
+            Hand::new(String::from("AAAAA"), 111, false),
+            Hand::new(String::from("KKKKK"), 222, false)
         ];
         assert_ne!(&hands,&expected_ranked_hands)
     }
@@ -352,37 +367,39 @@ mod tests {
     #[test]
     fn test_build_hand_from_string_five_of_a_kind() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 3, }, 5);
+        cards.insert(Card { label: String::from("3"), strength: 3, joker: false }, 5);
         let expected_hand: Hand = Hand {
             cards,
             hand_vec: vec![],
             hand_type: Type::FiveOfAKind,
             bid: 111,
+            joker: false
         };
-        let hand: Hand = Hand::new(String::from("33333"), 111);
+        let hand: Hand = Hand::new(String::from("33333"), 111, false);
         assert_eq!(hand, expected_hand);
     }
 
     #[test]
     fn test_build_hand_from_string_two_pair() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 3, }, 2);
-        cards.insert(Card { label: String::from("2"), strength: 2, }, 2);
-        cards.insert(Card { label: String::from("T"), strength: 1, }, 1);
+        cards.insert(Card { label: String::from("3"), strength: 3, joker: false }, 2);
+        cards.insert(Card { label: String::from("2"), strength: 2, joker: false }, 2);
+        cards.insert(Card { label: String::from("T"), strength: 1, joker: false }, 1);
         let expected_hand: Hand = Hand {
             cards,
             hand_vec: vec![],
             hand_type: TwoPair,
-            bid: 111
+            bid: 111,
+            joker: false
         };
-        let hand: Hand = Hand::new(String::from("12323"), 111);
+        let hand: Hand = Hand::new(String::from("12323"), 111, false);
         assert_eq!(hand, expected_hand);
     }
 
     #[test]
     fn test_determines_type_for_five_of_a_kind_correctly() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 0, }, 5);
+        cards.insert(Card { label: String::from("3"), strength: 0, joker: false }, 5);
         let hand_type: Type = Hand::determine_type_for_cards(&cards);
         assert_eq!(hand_type, FiveOfAKind);
     }
@@ -390,8 +407,8 @@ mod tests {
     #[test]
     fn test_determines_type_for_four_of_a_kind_correctly() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 0, }, 4);
-        cards.insert(Card { label: String::from("2"), strength: 0, }, 1);
+        cards.insert(Card { label: String::from("3"), strength: 0, joker: false }, 4);
+        cards.insert(Card { label: String::from("2"), strength: 0, joker: false }, 1);
         let hand_type: Type = Hand::determine_type_for_cards(&cards);
         assert_eq!(hand_type, FourOfAKind);
     }
@@ -399,8 +416,8 @@ mod tests {
     #[test]
     fn test_determines_type_for_full_house_correctly() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 0, }, 3);
-        cards.insert(Card { label: String::from("2"), strength: 0, }, 2);
+        cards.insert(Card { label: String::from("3"), strength: 0, joker: false }, 3);
+        cards.insert(Card { label: String::from("2"), strength: 0, joker: false }, 2);
         let hand_type: Type = Hand::determine_type_for_cards(&cards);
         assert_eq!(hand_type, FullHouse);
     }
@@ -408,9 +425,9 @@ mod tests {
     #[test]
     fn test_determines_type_for_three_of_a_kind_correctly() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 0, }, 3);
-        cards.insert(Card { label: String::from("2"), strength: 0, }, 1);
-        cards.insert(Card { label: String::from("T"), strength: 0, }, 1);
+        cards.insert(Card { label: String::from("3"), strength: 0, joker: false }, 3);
+        cards.insert(Card { label: String::from("2"), strength: 0, joker: false }, 1);
+        cards.insert(Card { label: String::from("T"), strength: 0, joker: false }, 1);
         let hand_type: Type = Hand::determine_type_for_cards(&cards);
         assert_eq!(hand_type, ThreeOfAKind);
     }
@@ -418,9 +435,9 @@ mod tests {
     #[test]
     fn test_determines_type_for_two_pair_correctly() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 0, }, 2);
-        cards.insert(Card { label: String::from("2"), strength: 0, }, 2);
-        cards.insert(Card { label: String::from("T"), strength: 0, }, 1);
+        cards.insert(Card { label: String::from("3"), strength: 0, joker: false }, 2);
+        cards.insert(Card { label: String::from("2"), strength: 0, joker: false }, 2);
+        cards.insert(Card { label: String::from("T"), strength: 0, joker: false }, 1);
         let hand_type: Type = Hand::determine_type_for_cards(&cards);
         assert_eq!(hand_type, TwoPair);
     }
@@ -428,10 +445,10 @@ mod tests {
     #[test]
     fn test_determines_type_for_one_pair_correctly() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 0, }, 2);
-        cards.insert(Card { label: String::from("2"), strength: 0, }, 1);
-        cards.insert(Card { label: String::from("T"), strength: 0, }, 1);
-        cards.insert(Card { label: String::from("K"), strength: 0, }, 1);
+        cards.insert(Card { label: String::from("3"), strength: 0, joker: false }, 2);
+        cards.insert(Card { label: String::from("2"), strength: 0, joker: false }, 1);
+        cards.insert(Card { label: String::from("T"), strength: 0, joker: false }, 1);
+        cards.insert(Card { label: String::from("K"), strength: 0, joker: false }, 1);
         let hand_type: Type = Hand::determine_type_for_cards(&cards);
         assert_eq!(hand_type, OnePair);
     }
@@ -439,55 +456,66 @@ mod tests {
     #[test]
     fn test_determines_type_for_high_card_correctly() {
         let mut cards: HashMap<Card, i32> = HashMap::new();
-        cards.insert(Card { label: String::from("3"), strength: 0, }, 1);
-        cards.insert(Card { label: String::from("2"), strength: 0, }, 1);
-        cards.insert(Card { label: String::from("T"), strength: 0, }, 1);
-        cards.insert(Card { label: String::from("K"), strength: 0, }, 1);
-        cards.insert(Card { label: String::from("8"), strength: 0, }, 1);
+        cards.insert(Card { label: String::from("3"), strength: 0, joker: false }, 1);
+        cards.insert(Card { label: String::from("2"), strength: 0, joker: false }, 1);
+        cards.insert(Card { label: String::from("T"), strength: 0, joker: false }, 1);
+        cards.insert(Card { label: String::from("K"), strength: 0, joker: false }, 1);
+        cards.insert(Card { label: String::from("8"), strength: 0, joker: false }, 1);
         let hand_type: Type = Hand::determine_type_for_cards(&cards);
         assert_eq!(hand_type, HighCard);
     }
 
     #[test]
     fn test_get_strength_correctly() {
-        let card1: Card = Card {
-            label: String::from("A"),
+        let mut card1: Card = Card {
+            label: String::from("J"),
             strength: 0,
+            joker: false
         };
-        assert_eq!(card1.get_strength(), 14);
-        let card1: Card = Card {
+        card1.calculate_strength();
+        assert_eq!(card1.strength, 11);
+        let mut card1: Card = Card {
             label: String::from("8"),
             strength: 0,
+            joker: false
         };
-        assert_eq!(card1.get_strength(), 8);
+        card1.calculate_strength();
+        assert_eq!(card1.strength, 8);
+        let mut card1: Card = Card {
+            label: String::from("J"),
+            strength: 0,
+            joker: true
+        };
+        card1.calculate_strength();
+        assert_eq!(card1.strength, 0);
     }
 
     #[test]
     fn test_part1() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day7/test/input.txt");
-        assert_eq!(day7_part1(&d), 6440);
+        assert_eq!(calculate_winnings(&d, false), 6440);
     }
 
     #[test]
     fn part1() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day7/input.txt");
-        assert_eq!(day7_part1(&d), 250370104);
+        assert_eq!(calculate_winnings(&d, false), 250370104);
     }
 
     #[test]
     fn test_part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("resources/day7/test/input1.txt");
-        //assert_eq!(day7_part2(&d), 281);
+        d.push("resources/day7/test/input.txt");
+        assert_eq!(calculate_winnings(&d, true), 5905);
     }
 
     #[test]
     fn part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day7/input.txt");
-        //assert_eq!(day7_part2(&d), 281);
+        assert_eq!(calculate_winnings(&d, true), 251735672);
     }
 
 }
