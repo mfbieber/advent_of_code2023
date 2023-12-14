@@ -101,6 +101,34 @@ impl Hand {
                 return card;
             }).collect();
 
+        Self::remove_jokers_and_generate_map(joker, &mut cards, &hand_vec);
+        Self::replace_joker_with_cards(joker, &mut cards, &hand_vec);
+
+        let hand_type: Type = Hand::determine_type_for_cards(&cards);
+        return Hand { cards, hand_vec, hand_type, bid, joker }
+    }
+
+    fn replace_joker_with_cards(joker: bool, mut cards: &mut HashMap<Card, i32>, hand_vec: &Vec<Card>) {
+        let joker_card: Card = Card { label: String::from("J"), strength: 0, joker };
+        if joker && hand_vec.contains(&joker_card) {
+            let mut keys: Vec<Card> = cards.keys().cloned().collect::<Vec<Card>>();
+            keys.sort_by(|a, b| cards.get(b).unwrap().cmp(cards.get(a).unwrap()));
+            let joker_count = hand_vec.iter().filter(|card| {
+                return if joker && card.label == String::from("J") {
+                    true
+                } else {
+                    false
+                }
+            }).count();
+            if keys.len() > 0 {
+                cards.insert(keys[0].clone(), cards.get(&keys[0]).unwrap() + joker_count as i32);
+            } else {
+                cards.insert(Card { label: String::from("A"), strength: 14, joker }, joker_count as i32);
+            }
+        }
+    }
+
+    fn remove_jokers_and_generate_map(joker: bool, mut cards: &mut HashMap<Card, i32>, hand_vec: &Vec<Card>) {
         let _ = hand_vec.iter().filter(|card| {
             return if joker && card.label == String::from("J") {
                 false
@@ -115,25 +143,6 @@ impl Hand {
                 cards.insert(card.clone(), 1);
             }
         });
-        let joker_card: Card = Card { label: String::from("J"), strength: 0, joker };
-        if joker && hand_vec.contains(&joker_card) {
-            let mut keys: Vec<Card> = cards.keys().cloned().collect::<Vec<Card>>();
-            keys.sort_by(|a,b| cards.get(b).unwrap().cmp(cards.get(a).unwrap()));
-            let joker_count = hand_vec.iter().filter(|card| {
-                return if joker && card.label == String::from("J") {
-                    true
-                } else {
-                    false
-                }
-            }).count();
-            if keys.len() > 0 {
-                cards.insert(keys[0].clone(), cards.get(&keys[0]).unwrap() + joker_count as i32);
-            } else {
-                cards.insert(Card { label: String::from("A"), strength: 14, joker }, joker_count as i32);
-            }
-        }
-        let hand_type: Type = Hand::determine_type_for_cards(&cards);
-        return Hand { cards, hand_vec, hand_type, bid, joker }
     }
 
     fn determine_type_for_cards(cards: &HashMap<Card, i32>) -> Type {
@@ -376,6 +385,13 @@ mod tests {
             joker: false
         };
         let hand: Hand = Hand::new(String::from("33333"), 111, false);
+        assert_eq!(hand, expected_hand);
+    }
+
+    #[test]
+    fn test_builds_hand_correctly_from_only_jokers() {
+        let hand: Hand = Hand::new(String::from("JJJJJ"), 111, true);
+        let expected_hand: Hand = Hand::new(String::from("AAAAA"), 111, true);
         assert_eq!(hand, expected_hand);
     }
 
