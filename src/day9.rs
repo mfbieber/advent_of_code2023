@@ -51,6 +51,18 @@ impl History {
         return previous + self.values.last().unwrap();
     }
 
+    fn previous_value(&self) -> i32 {
+        let mut previous: i32 = *self.differences.last().unwrap().first().unwrap();
+        let mut first: bool = true;
+        self.differences.iter().rev().for_each(|differences| {
+            if !first {
+                previous = differences.first().unwrap() - previous;
+            }
+            first = false;
+        });
+        return self.values.first().unwrap() - previous;
+    }
+
 }
 
 fn day9_part2(path: &PathBuf) -> i32 {
@@ -58,7 +70,9 @@ fn day9_part2(path: &PathBuf) -> i32 {
     // File input.txt must exist in the current path
     if let Ok(lines) = read_lines(path) {
         for line in lines {
-
+            let mut history: History = History::new(line.unwrap());
+            history.calculate_differences();
+            sum = sum + history.previous_value();
         }
     }
     println!("{}", sum);
@@ -82,7 +96,16 @@ fn day9_part1(path: &PathBuf) -> i32 {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use crate::day9::{day9_part1, History};
+    use crate::day9::{day9_part1, day9_part2, History};
+
+    #[test]
+    fn test_calculates_previous_history_value_correctly_3() {
+        let history_string = String::from("10 13 16 21 30 45");
+        let mut history: History = History::new(history_string);
+        history.calculate_differences();
+        let previous_history_value: i32 = history.previous_value();
+        assert_eq!(previous_history_value, 5);
+    }
 
     #[test]
     fn test_calculates_next_history_value_correctly_3() {
@@ -145,15 +168,15 @@ mod tests {
     #[test]
     fn test_part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("resources/day9/test/input1.txt");
-        //assert_eq!(day9_part2(&d), 281);
+        d.push("resources/day9/test/input.txt");
+        assert_eq!(day9_part2(&d), 2);
     }
 
     #[test]
     fn part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day9/input.txt");
-        //assert_eq!(day9_part2(&d), 281);
+        assert_eq!(day9_part2(&d), 905);
     }
 
 }
