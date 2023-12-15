@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::Chars;
+use std::vec;
 use crate::read_lines;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -28,29 +29,71 @@ impl Node {
     }
 }
 
-fn day8_part2(path: &PathBuf) -> i32 {
-    let mut sum: i32 = 0;
-    // File input.txt must exist in the current path
-    if let Ok(lines) = read_lines(path) {
-        for line in lines {
-
-        }
-    }
-    println!("{}", sum);
-    return sum;
-}
-
-fn day8_part1(path: &PathBuf, instructions: Vec<String>) -> i32 {
-    let mut steps: i32 = 0;
+fn day8_part2(path: &PathBuf, instructions: Vec<String>) -> i64 {
     let mut nodes: HashMap<String,Node> = HashMap::new();
     read_network(path, &mut nodes,);
 
+    let start_nodes: Vec<&String> = nodes.keys()
+        .filter(|node| node.ends_with("A"))
+        .collect::<Vec<&String>>();
+
+    return count_steps_for_path_part2(start_nodes, String::from("Z"), &instructions, &nodes);
+}
+
+fn day8_part1(path: &PathBuf, instructions: Vec<String>) -> i32 {
+    let mut nodes: HashMap<String,Node> = HashMap::new();
+    read_network(path, &mut nodes,);
+    return count_steps_for_path(String::from("AAA"), String::from("ZZZ"), &instructions, &nodes);
+}
+
+fn count_steps_for_path_part2(start_nodes: Vec<&String>, end_node_match: String, instructions: &Vec<String>,
+                              nodes: &HashMap<String,Node>) -> i64 {
+    let mut steps: i32 = 0;
+    let mut current_nodes: Vec<&String> = start_nodes;
     let iter_length: usize = instructions.len() - 1;
     let mut i: usize = 0;
-    let mut next_node: String = String::from("AAA");;
+    let mut paths: Vec<i32> = current_nodes.iter().map(|node| 0).collect();
+    //paths cycle (debug observation), looking for LCM of the path's lengths
+    while paths.iter().any(|path_length| *path_length == 0) {
+        let mut node_number: i32 = 0;
+        current_nodes = current_nodes.iter().map(|node| {
+            let current_node: &Node = nodes.get(&*node.clone()).unwrap();
+            if current_node.label.ends_with("Z") {
+                paths[node_number as usize] = steps;
+            }
+            node_number += 1;
+            let instruction: String = instructions[i].clone();
+            return if instruction == "L" {
+                &current_node.left
+            } else {
+                &current_node.right
+            }
+        }).collect::<Vec<&String>>();
+        node_number = 0;
+        steps += 1;
+        if i == iter_length {
+            i = 0;
+        } else {
+            i += 1;
+        }
+    }
+    let mut lcm: i64 = 1;
+    paths.iter().for_each(|path| {
+        lcm = num::integer::lcm(lcm, *path as i64);
+    });
+    println!("{}", lcm);
+    return lcm;
+}
+
+fn count_steps_for_path(start_node_match: String, end_node_match: String, instructions: &Vec<String>,
+                        nodes: &HashMap<String,Node>) -> i32 {
+    let mut steps: i32 = 0;
+    let iter_length: usize = instructions.len() - 1;
+    let mut i: usize = 0;
+    let mut next_node: String = start_node_match;
     loop {
-        let current_node: &Node = nodes.get(&next_node).unwrap();
-        if current_node.label == String::from("ZZZ") {
+        let current_node: &Node = nodes.get(&*next_node.clone()).unwrap();
+        if current_node.label.ends_with(end_node_match.as_str()) {
             break;
         }
         steps += 1;
@@ -65,8 +108,7 @@ fn day8_part1(path: &PathBuf, instructions: Vec<String>) -> i32 {
         } else {
             i += 1;
         }
-    }
-
+    };
     println!("{}", steps);
     return steps;
 }
@@ -95,7 +137,7 @@ fn read_network(path: &PathBuf, mut nodes: &mut HashMap<String, Node>){
 mod tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
-    use crate::day8::{day8_part1, Node, read_network};
+    use crate::day8::{day8_part1, day8_part2, Node, read_network};
 
     #[test]
     fn test_reads_nodes_correctly() {
@@ -175,7 +217,7 @@ mod tests {
         let instructions: Vec<String> = String::from("LR").chars()
             .map(|c| c.to_string())
             .collect::<Vec<String>>();
-        let steps: i32 = day8_part1(&d, instructions);
+        let steps: i64 = day8_part2(&d, instructions);
         assert_eq!(steps, 6);
     }
 
@@ -183,7 +225,11 @@ mod tests {
     fn part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day8/input.txt");
-        //assert_eq!(day8_part2(&d), 281);
+        let instructions: Vec<String> = String::from("LLRLRLRRRLRLRRRLRRRLRRLLRLLRRRLRLRRLLRLRLRRLRLRLLRLRRRLRLRRLRRLRRRLRRLRRLRRLLRRLLRRRLRRLRRLRRRLRLRRLRRLLLLRLRRLRLRRLLLRRLRRRLRRRLLRRRLRRRLRRLRRRLLLRRRLLLRRLRRLRRRLRRLRRRLRRLRRRLLRLRLRRRLRRLRLRLRRRLRLRLLLRRRLRRRLRRLRRLRLRRRLRRRLLRRRLRRLRLLLRRLLRRRLRRRLRRRLLRRRLLRRLRLRRRLRRLRRRR").chars()
+            .map(|c| c.to_string())
+            .collect::<Vec<String>>();
+        let steps: i64 = day8_part2(&d, instructions);
+        assert_eq!(steps, 15299095336639);
     }
 
 }
