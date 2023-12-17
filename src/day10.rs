@@ -1,5 +1,6 @@
 use std::ops::Deref;
 use std::path::PathBuf;
+use num::Integer;
 use crate::read_lines;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -8,7 +9,8 @@ struct Tile {
     x: i32,
     y: i32,
     passed: bool,
-    distance: i32
+    distance: i32,
+    enclosed: bool
 }
 
 impl Tile {
@@ -20,6 +22,7 @@ impl Tile {
             y,
             passed: false,
             distance: -1,
+            enclosed: false
         }
     }
 
@@ -190,38 +193,36 @@ fn find_start_tile(tiles: &Vec<Vec<Tile>>) -> Tile {
     return start_tile;
 }
 
-fn day10_part2(path: &PathBuf) -> i32 {
-    let mut sum: i32 = 0;
-    // File input.txt must exist in the current path
-    if let Ok(lines) = read_lines(path) {
-        for line in lines {
-
+//https://www.eecs.umich.edu/courses/eecs380/HANDOUTS/PROJ2/InsidePoly.html
+//Determining if a point lies on the interior of a polygon
+fn find_enclosed_tiles(tiles: &mut Vec<Vec<Tile>>) -> i32 {
+    let mut enclosed_tiles: i32 = 0;
+    let mut y: usize = 0;
+    let mut x: usize = 0;
+    while y < tiles.len() {
+        let mut traverse: i32 = 0;
+        while x < tiles[y].len() {
+            if tiles[y][x].passed
+                && (tiles[y][x].char == '|' || tiles[y][x].char == 'L'
+                || tiles[y][x].char == 'J' ){
+                traverse += 1;
+            } else if !tiles[y][x].passed && traverse != 0 && traverse.is_odd() {
+                tiles[y][x].enclosed = true;
+                enclosed_tiles += 1;
+            }
+            x += 1;
         }
+        x = 0;
+        traverse = 0;
+        y += 1;
     }
-    println!("{}", sum);
-    return sum;
-}
-
-fn day10_part1(path: &PathBuf) -> i32 {
-    let mut sum: i32 = 0;
-    // File input.txt must exist in the current path
-    if let Ok(lines) = read_lines(path) {
-        for line in lines {
-            let split: Vec<&str> = line
-                .as_ref()
-                .unwrap()
-                .split(" ")
-                .collect::<Vec<&str>>();
-        }
-    }
-    println!("{}", sum);
-    return sum;
+    return enclosed_tiles;
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use crate::day10::{find_start_tile, get_longest_path, read_tiles, Tile};
+    use crate::day10::{find_enclosed_tiles, find_start_tile, get_longest_path, read_tiles, Tile};
 
     #[test]
     fn test_finds_longest_path_length_correctly_start_input2() {
@@ -302,15 +303,89 @@ mod tests {
     #[test]
     fn test_part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("resources/day10/test/input.txt");
-        //assert_eq!(day10_part2(&d), 281);
+        d.push("resources/day10/test/input3.txt");
+        let mut tiles: Vec<Vec<Tile>> = read_tiles(&d);
+        let mut start_tile: Tile = find_start_tile(&tiles);
+        let connected = start_tile.get_connected_pipes(&tiles);
+        tiles[start_tile.y as usize][start_tile.x as usize].distance = 0;
+        tiles[start_tile.y as usize][start_tile.x as usize].passed = true;
+        let path_length: i32 = get_longest_path(&mut tiles, connected.0.x, connected.0.y, connected.1.x, connected.1.y);
+        let enclosed_tiles: i32 = find_enclosed_tiles(&mut tiles);
+        assert_eq!(enclosed_tiles, 4);
+    }
+
+    #[test]
+    fn test_part2_larger_example() {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/day10/test/input5.txt");
+        let mut tiles: Vec<Vec<Tile>> = read_tiles(&d);
+        let mut start_tile: Tile = find_start_tile(&tiles);
+        let connected = start_tile.get_connected_pipes(&tiles);
+        tiles[start_tile.y as usize][start_tile.x as usize].distance = 0;
+        tiles[start_tile.y as usize][start_tile.x as usize].passed = true;
+        let path_length: i32 = get_longest_path(&mut tiles, connected.0.x, connected.0.y, connected.1.x, connected.1.y);
+        let enclosed_tiles: i32 = find_enclosed_tiles(&mut tiles);
+        print_path(&mut tiles);
+        assert_eq!(enclosed_tiles, 10);
+    }
+
+    #[test]
+    fn test_part2_larger_example2() {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/day10/test/input4.txt");
+        let mut tiles: Vec<Vec<Tile>> = read_tiles(&d);
+        let mut start_tile: Tile = find_start_tile(&tiles);
+        let connected = start_tile.get_connected_pipes(&tiles);
+        tiles[start_tile.y as usize][start_tile.x as usize].distance = 0;
+        tiles[start_tile.y as usize][start_tile.x as usize].passed = true;
+        let path_length: i32 = get_longest_path(&mut tiles, connected.0.x, connected.0.y, connected.1.x, connected.1.y);
+        let enclosed_tiles: i32 = find_enclosed_tiles(&mut tiles);
+        print_path(&mut tiles);
+        assert_eq!(enclosed_tiles, 8);
+    }
+
+    fn print_path(tiles: &mut Vec<Vec<Tile>>) {
+        tiles.iter().for_each(|line| {
+            line.iter().for_each(|tile| {
+                if tile.enclosed {
+                    print!("{}", "I");
+                } else if tile.passed {
+                    if tile.char == '7' {
+                        print!("{}", '┐');
+                    } else if tile.char == 'L' {
+                        print!("{}", '└');
+                    } else if tile.char == 'J' {
+                        print!("{}", '┘');
+                    } else if tile.char == 'F' {
+                        print!("{}", '┌');
+                    } else if tile.char == '-' {
+                        print!("{}", '-');
+                    } else if tile.char == '|' {
+                        print!("{}", '│');
+                    } else if tile.char == 'S' {
+                        print!("{}", 'S');
+                    }
+                } else {
+                    print!("{}", tile.char)
+                }
+            });
+            println!();
+        });
     }
 
     #[test]
     fn part2() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/day10/input.txt");
-        //assert_eq!(day10_part2(&d), 281);
+        let mut tiles: Vec<Vec<Tile>> = read_tiles(&d);
+        let mut start_tile: Tile = find_start_tile(&tiles);
+        let connected = start_tile.get_connected_pipes(&tiles);
+        tiles[start_tile.y as usize][start_tile.x as usize].distance = 0;
+        tiles[start_tile.y as usize][start_tile.x as usize].passed = true;
+        let path_length: i32 = get_longest_path(&mut tiles, connected.0.x, connected.0.y, connected.1.x, connected.1.y);
+        let enclosed_tiles: i32 = find_enclosed_tiles(&mut tiles);
+        print_path(&mut tiles);
+        assert_eq!(enclosed_tiles, 291);
     }
 
 }
