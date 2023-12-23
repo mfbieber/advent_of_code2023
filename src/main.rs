@@ -18,7 +18,6 @@ mod day10;
 mod day11;
 mod day12;
 mod day13;
-
 fn main() {}
 
 // The output is wrapped in a Result to allow matching on errors
